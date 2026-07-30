@@ -8,6 +8,9 @@
 - Audit passes: 2
 - Audit failures: 0
 - Hallucination risk: 2 low, 0 medium, 0 high
+- Retrieval mode: keyword
+- Retrieval metrics: No expected_evidence_chunk_ids annotations were provided in queries.json.
+- Revised answers generated: 0
 
 ## Query-by-Query Results
 
@@ -30,6 +33,10 @@
 **Support assessment:** The draft answer is supported by the final context. All three provided chunks only state that 'InsightBoard is a business' and contain no information about product features. The draft correctly refrains from inventing features and clearly says the evidence is insufficient to list features.
 
 **Citation check:** All cited chunk IDs (chunk_4bd3e144c20afe74, chunk_6e6428e7fc21e9af, chunk_bd68fd559fe1b481) are present in the final context and accurately reflect the content used.
+
+**Retrieval error analysis:** chunking
+
+Retrieved context relied on boundary-heavy chunks that begin or end mid-token, which suggests the evidence may have been split across chunk boundaries.
 
 **Final recommendation:** No change required.
 
@@ -67,6 +74,10 @@ No retrieval overrides were applied.
 ## Failure Modes Observed
 
 No major answer-grounding failures were observed.
+
+## Retrieval Error Analysis
+
+- **q1 — chunking**: Retrieved context relied on boundary-heavy chunks that begin or end mid-token, which suggests the evidence may have been split across chunk boundaries.
 
 ## Recommended Improvements
 

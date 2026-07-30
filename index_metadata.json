@@ -1,8 +1,23 @@
 {
-  "engine": "minisearch",
-  "indexed_fields": [
-    "text"
-  ],
+  "index_id": "index_b3f3bc4424f8bcff",
+  "version": "1.0",
+  "algorithm": "bm25",
+  "source_file": "chunks.json",
+  "source_chunks_sha256": "61e78096cd9baa13783ce3779f00d4ef6d985c0cd19a9c038553f845ab9d383d",
+  "index_sha256": "b3f3bc4424f8bcffe1c0c3ae86781fdd23e8841e41ab46cd330750642376f81b",
   "chunk_count": 28,
+  "unique_term_count": 41,
+  "total_token_count": 191,
+  "average_chunk_length": 6.821429,
+  "tokenizer_version": "unicode-word-v1",
+  "parameters": {
+    "k1": 1.2,
+    "b": 0.75
+  },
+  "retrieval_mode": "keyword",
+  "retrieval_modes_supported": [
+    "keyword",
+    "bm25"
+  ],
   "top_k": 3
 }

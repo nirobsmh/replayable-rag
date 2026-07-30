@@ -3,14 +3,23 @@ import fs from "node:fs/promises";
 type Query = {
   query_id: string;
   question: string;
+  expected_evidence_chunk_ids?: string[];
 };
 
 type Policy = {
+  top_k?: number;
+  retrieval_mode?: string;
   allowed_labels: string[];
 };
 
 type Chunk = {
   chunk_id: string;
+};
+
+type IndexMetadata = {
+  retrieval_mode?: string;
+  retrieval_modes_supported?: string[];
+  top_k?: number;
 };
 
 type RetrievalResult = {
@@ -19,6 +28,30 @@ type RetrievalResult = {
     chunk_id: string;
   }>;
 };
+
+type RetrievalMetrics =
+  | {
+      status: "skipped";
+      retrieval_mode: string;
+      top_k: number;
+      reason: string;
+    }
+  | {
+      status: "computed";
+      retrieval_mode: string;
+      top_k: number;
+      annotated_query_count: number;
+      hit_rate_at_k: number;
+      average_recall_at_k: number;
+      per_query: Array<{
+        query_id: string;
+        expected_evidence_chunk_ids: string[];
+        retrieved_chunk_ids: string[];
+        matched_chunk_ids: string[];
+        hit_at_k: boolean;
+        recall_at_k: number;
+      }>;
+    };
 
 type DraftAnswer = {
   query_id: string;
@@ -35,6 +68,22 @@ type ReviewResult = {
 
 type AuditResult = {
   query_id: string;
+  audit_label?: "pass" | "fail";
+  hallucination_risk?: "low" | "medium" | "high";
+};
+
+type RevisedAnswer = {
+  query_id: string;
+  label: string;
+  citations: string[];
+  trigger_audit_label: "pass" | "fail";
+  trigger_hallucination_risk: "low" | "medium" | "high";
+};
+
+type RetrievalErrorAnalysisEntry = {
+  query_id: string;
+  failure_type: "ranking" | "chunking" | "ambiguity" | "corpus_gap";
+  description: string;
 };
 
 type LlmLog = {
@@ -58,11 +107,15 @@ const requiredFiles = [
   "queries.json",
   "policy.json",
   "chunks.json",
+  "index.json",
   "index_metadata.json",
   "retrieval_results.json",
+  "retrieval_metrics.json",
   "draft_answers.json",
   "review_overrides.json",
   "answer_audit.json",
+  "revised_answers.json",
+  "retrieval_error_analysis.json",
   "final_report.md",
   "llm_calls.jsonl",
 ];
@@ -176,12 +229,20 @@ async function main(): Promise<void> {
   const queries = await readJson<Query[]>("queries.json");
   const policy = await readJson<Policy>("policy.json");
   const chunks = await readJson<Chunk[]>("chunks.json");
+  const indexMetadata = await readJson<IndexMetadata>("index_metadata.json");
   const retrievals = await readJson<RetrievalResult[]>(
     "retrieval_results.json",
+  );
+  const retrievalMetrics = await readJson<RetrievalMetrics>(
+    "retrieval_metrics.json",
   );
   const drafts = await readJson<DraftAnswer[]>("draft_answers.json");
   const reviews = await readJson<ReviewResult[]>("review_overrides.json");
   const audits = await readJson<AuditResult[]>("answer_audit.json");
+  const revisedAnswers = await readJson<RevisedAnswer[]>("revised_answers.json");
+  const retrievalErrorAnalysis = await readJson<RetrievalErrorAnalysisEntry[]>(
+    "retrieval_error_analysis.json",
+  );
   const logs = await readJsonLines("llm_calls.jsonl");
   const report = await fs.readFile("final_report.md", "utf8");
 
@@ -194,28 +255,75 @@ async function main(): Promise<void> {
     );
   }
 
+  if (!Number.isInteger(policy.top_k) || (policy.top_k ?? 0) <= 0) {
+    throw new Error("policy.json must define a positive top_k.");
+  }
+
+  if (
+    !indexMetadata.retrieval_mode ||
+    !Array.isArray(indexMetadata.retrieval_modes_supported)
+  ) {
+    throw new Error(
+      "index_metadata.json must define retrieval_mode and retrieval_modes_supported.",
+    );
+  }
+
+  if (!indexMetadata.retrieval_modes_supported.includes(indexMetadata.retrieval_mode)) {
+    throw new Error(
+      `Selected retrieval mode ${indexMetadata.retrieval_mode} is not listed in retrieval_modes_supported.`,
+    );
+  }
+
+  if (indexMetadata.retrieval_modes_supported.length < 2) {
+    throw new Error("At least two retrieval modes must be supported.");
+  }
+
+  if (
+    policy.retrieval_mode !== undefined &&
+    policy.retrieval_mode !== indexMetadata.retrieval_mode
+  ) {
+    throw new Error("policy.json retrieval_mode does not match index_metadata.json.");
+  }
+
+  if (indexMetadata.top_k !== policy.top_k) {
+    throw new Error("index_metadata.json top_k does not match policy.json top_k.");
+  }
+
+  if (retrievalMetrics.retrieval_mode !== indexMetadata.retrieval_mode) {
+    throw new Error(
+      "retrieval_metrics.json retrieval_mode does not match index_metadata.json.",
+    );
+  }
+
+  if (retrievalMetrics.top_k !== policy.top_k) {
+    throw new Error("retrieval_metrics.json top_k does not match policy.json top_k.");
+  }
+
   logs.forEach((log, index) => {
     validateLlmLog(log, index);
   });
 
   const chunkIds = new Set(chunks.map((chunk) => chunk.chunk_id));
-
   const retrievalByQuery = new Map(
     retrievals.map((result) => [result.query_id, result]),
   );
-
   const draftByQuery = new Map(drafts.map((draft) => [draft.query_id, draft]));
-
   const reviewByQuery = new Map(
     reviews.map((review) => [review.query_id, review]),
   );
-
-  const auditQueryIds = new Set(audits.map((audit) => audit.query_id));
+  const auditByQuery = new Map(audits.map((audit) => [audit.query_id, audit]));
+  const revisedByQuery = new Map(
+    revisedAnswers.map((answer) => [answer.query_id, answer]),
+  );
+  const retrievalErrorByQuery = new Map(
+    retrievalErrorAnalysis.map((entry) => [entry.query_id, entry]),
+  );
 
   for (const query of queries) {
     const retrieval = retrievalByQuery.get(query.query_id);
     const draft = draftByQuery.get(query.query_id);
     const review = reviewByQuery.get(query.query_id);
+    const audit = auditByQuery.get(query.query_id);
 
     if (!retrieval) {
       throw new Error(`Missing retrieval result for ${query.query_id}`);
@@ -223,6 +331,12 @@ async function main(): Promise<void> {
 
     if (retrieval.retrieved_chunks.length === 0) {
       throw new Error(`No retrieved chunks for ${query.query_id}`);
+    }
+
+    if (retrieval.retrieved_chunks.length > (policy.top_k ?? 0)) {
+      throw new Error(
+        `Retrieval result for ${query.query_id} exceeds top_k=${policy.top_k}.`,
+      );
     }
 
     if (!draft) {
@@ -259,8 +373,52 @@ async function main(): Promise<void> {
       }
     }
 
-    if (!auditQueryIds.has(query.query_id)) {
+    if (!audit) {
       throw new Error(`Missing audit for ${query.query_id}`);
+    }
+
+    const requiresRevision =
+      audit.audit_label === "fail" || audit.hallucination_risk === "high";
+    const revisedAnswer = revisedByQuery.get(query.query_id);
+
+    if (requiresRevision && !revisedAnswer) {
+      throw new Error(`Missing revised answer for ${query.query_id}`);
+    }
+
+    if (!requiresRevision && revisedAnswer) {
+      throw new Error(`Unexpected revised answer for ${query.query_id}`);
+    }
+
+    if (revisedAnswer) {
+      if (!policy.allowed_labels.includes(revisedAnswer.label)) {
+        throw new Error(
+          `Invalid revised answer label for ${query.query_id}: ${revisedAnswer.label}`,
+        );
+      }
+
+      const finalChunkIds = new Set(review.final_chunk_ids);
+
+      for (const citation of revisedAnswer.citations) {
+        if (!finalChunkIds.has(citation)) {
+          throw new Error(
+            `Revised answer ${query.query_id} cites non-reviewed chunk ${citation}`,
+          );
+        }
+      }
+    }
+
+    const retrievalError = retrievalErrorByQuery.get(query.query_id);
+
+    if (retrievalError && !retrievalError.description.trim()) {
+      throw new Error(
+        `Retrieval error analysis for ${query.query_id} must include a description.`,
+      );
+    }
+
+    if (draft.label !== "supported" && !retrievalError) {
+      throw new Error(
+        `Expected retrieval error analysis for unsupported query ${query.query_id}`,
+      );
     }
 
     const draftLogs = logs.filter(
@@ -285,8 +443,21 @@ async function main(): Promise<void> {
       );
     }
 
-    const auditLog = auditLogs[0];
+    if (requiresRevision) {
+      const revisedLogs = logs.filter(
+        (log) =>
+          log.stage === "revised_answer_generation" &&
+          log.query_id === query.query_id,
+      );
 
+      if (revisedLogs.length !== 1) {
+        throw new Error(
+          `Expected one revised-answer LLM log for ${query.query_id}, found ${revisedLogs.length}`,
+        );
+      }
+    }
+
+    const auditLog = auditLogs[0];
     const auditUsesReviewedContext = isStringArray(auditLog.input_artifacts)
       ? auditLog.input_artifacts.includes("review_overrides.json")
       : isStringArray(auditLog.final_chunk_ids);
@@ -308,6 +479,22 @@ async function main(): Promise<void> {
         );
       }
     }
+  }
+
+  if (retrievalMetrics.status === "computed") {
+    const annotatedQueries = queries.filter(
+      (query) =>
+        Array.isArray(query.expected_evidence_chunk_ids) &&
+        query.expected_evidence_chunk_ids.length > 0,
+    );
+
+    if (retrievalMetrics.annotated_query_count !== annotatedQueries.length) {
+      throw new Error(
+        "retrieval_metrics.json annotated_query_count does not match queries.json annotations.",
+      );
+    }
+  } else if (!retrievalMetrics.reason.trim()) {
+    throw new Error("Skipped retrieval metrics must include a reason.");
   }
 
   console.log("Validation complete.");

@@ -11,14 +11,17 @@
     "index": "tsx scripts/build-index.ts",
     "prepare:corpus": "npm run chunk && npm run index",
     "retrieve": "tsx scripts/retrieve.ts",
-    "pipeline:retrieval": "npm run chunk && npm run retrieve",
+    "metrics": "tsx scripts/retrieve.ts",
     "draft": "tsx scripts/generate-drafts.ts",
-    "pipeline:draft": "npm run chunk && npm run retrieve && npm run draft",
+    "regenerate": "tsx scripts/regenerate-answers.ts",
+    "analyze:retrieval": "tsx scripts/analyze-retrieval-errors.ts",
+    "pipeline:retrieval": "npm run chunk && npm run index && npm run retrieve",
+    "pipeline:draft": "npm run chunk && npm run index && npm run retrieve && npm run draft",
     "review": "tsx scripts/review.ts",
     "audit": "tsx scripts/audit-answers.ts",
     "report": "tsx scripts/generate-report.ts",
     "validate": "tsx scripts/validate.ts",
-    "pipeline": "npm run chunk && npm run retrieve && npm run draft && npm run review && npm run audit && npm run report && npm run validate"
+    "pipeline": "npm run chunk && npm run index && npm run retrieve && npm run draft && npm run review && npm run audit && npm run regenerate && npm run analyze:retrieval && npm run report && npm run validate"
 
   },
   "dependencies": {

@@ -1,0 +1,7 @@
+[
+  {
+    "query_id": "q1",
+    "failure_type": "chunking",
+    "description": "Retrieved context relied on boundary-heavy chunks that begin or end mid-token, which suggests the evidence may have been split across chunk boundaries."
+  }
+]

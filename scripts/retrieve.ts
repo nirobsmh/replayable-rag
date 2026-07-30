@@ -1,12 +1,16 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import MiniSearch from "minisearch";
 
+import { resolveRetrievalMode } from "../src/lib/pipeline/retrieval-config";
+import {
+  computeRetrievalMetrics,
+  retrieveQueries,
+} from "../src/lib/pipeline/retrieve-queries";
 import type {
   DocumentChunk,
   Policy,
   QueryInput,
-  QueryRetrievalResult,
+  RetrievalIndex,
 } from "../src/lib/pipeline/types";
 
 const root = process.cwd();
@@ -30,76 +34,39 @@ async function main(): Promise<void> {
   const queries = await readJson<QueryInput[]>("queries.json");
 
   const policy = await readJson<Policy>("policy.json");
+  const retrievalMode = resolveRetrievalMode(policy.retrieval_mode);
 
   if (!Number.isInteger(policy.top_k) || policy.top_k <= 0) {
     throw new Error("policy.json must contain a positive top_k.");
   }
 
-  const sortedChunks = [...chunks].sort((a, b) =>
-    a.chunk_id.localeCompare(b.chunk_id),
-  );
+  const retrievalIndex =
+    retrievalMode === "bm25"
+      ? await readJson<RetrievalIndex>("index.json")
+      : undefined;
 
-  const search = new MiniSearch<DocumentChunk>({
-    idField: "chunk_id",
-    fields: ["text"],
-    storeFields: ["chunk_id", "document_name"],
-  });
-
-  search.addAll(sortedChunks);
-
-  const retrievalResults: QueryRetrievalResult[] = queries.map((query) => {
-    let matches = search.search(query.question, {
-      prefix: true,
-    });
-
-    /*
-     * The requirement says every query must return at least one
-     * chunk unless the corpus is empty.
-     *
-     * When nothing matches, fall back to the first chunks using
-     * stable chunk_id ordering.
-     */
-    if (matches.length === 0) {
-      matches = sortedChunks.map((chunk) => ({
-        id: chunk.chunk_id,
-        score: 0,
-        match: {},
-        terms: [],
-        queryTerms: [],
-        chunk_id: chunk.chunk_id,
-        document_name: chunk.document_name,
-      }));
-    }
-
-    const topMatches = matches.slice(
-      0,
-      Math.min(policy.top_k, sortedChunks.length),
-    );
-
-    return {
-      query_id: query.query_id,
-      question: query.question,
-      retrieved_chunks: topMatches.map((match, index) => ({
-        chunk_id: String(match.chunk_id),
-        document_name: String(match.document_name),
-        rank: index + 1,
-        retrieval_score: Number(match.score.toFixed(6)),
-      })),
-    };
+  const retrievalResults = retrieveQueries({
+    chunks,
+    queries,
+    topK: policy.top_k,
+    retrievalMode,
+    index: retrievalIndex,
   });
 
   await writeJson("retrieval_results.json", retrievalResults);
+  await writeJson(
+    "retrieval_metrics.json",
+    computeRetrievalMetrics({
+      queries,
+      retrievals: retrievalResults,
+      topK: policy.top_k,
+      retrievalMode,
+    }),
+  );
 
-  const indexMetadata = {
-    engine: "minisearch",
-    indexed_fields: ["text"],
-    chunk_count: chunks.length,
-    top_k: policy.top_k,
-  };
-
-  await writeJson("index_metadata.json", indexMetadata);
-
-  console.log(`Retrieved results for ${queries.length} queries.`);
+  console.log(
+    `Retrieved results for ${queries.length} queries using ${retrievalMode} mode.`,
+  );
 }
 
 main().catch((error: unknown) => {

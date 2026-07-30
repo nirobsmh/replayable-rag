@@ -1,0 +1,6 @@
+{
+  "status": "skipped",
+  "retrieval_mode": "keyword",
+  "top_k": 3,
+  "reason": "No expected_evidence_chunk_ids annotations were provided in queries.json."
+}

@@ -1,5 +1,11 @@
 import fs from "node:fs/promises";
 
+import type {
+  RetrievalErrorAnalysisEntry,
+  RetrievalMetricsArtifact,
+  RevisedAnswer,
+} from "../src/lib/pipeline/types";
+
 type RetrievalResult = {
   query_id: string;
   question: string;
@@ -56,6 +62,12 @@ async function main(): Promise<void> {
   const reviews = await readJson<ReviewResult[]>("review_overrides.json");
 
   const audits = await readJson<AnswerAudit[]>("answer_audit.json");
+  const retrievalMetrics =
+    await readJson<RetrievalMetricsArtifact>("retrieval_metrics.json");
+  const revisedAnswers = await readJson<RevisedAnswer[]>("revised_answers.json");
+  const retrievalErrorAnalysis = await readJson<RetrievalErrorAnalysisEntry[]>(
+    "retrieval_error_analysis.json",
+  );
 
   const draftByQueryId = new Map(
     drafts.map((draft) => [draft.query_id, draft]),
@@ -67,6 +79,12 @@ async function main(): Promise<void> {
 
   const auditByQueryId = new Map(
     audits.map((audit) => [audit.query_id, audit]),
+  );
+  const revisedAnswerByQueryId = new Map(
+    revisedAnswers.map((answer) => [answer.query_id, answer]),
+  );
+  const retrievalErrorByQueryId = new Map(
+    retrievalErrorAnalysis.map((entry) => [entry.query_id, entry]),
   );
 
   const passedCount = audits.filter(
@@ -112,6 +130,21 @@ async function main(): Promise<void> {
   report.push(
     `- Hallucination risk: ${lowRiskCount} low, ${mediumRiskCount} medium, ${highRiskCount} high`,
   );
+  report.push(
+    `- Retrieval mode: ${
+      retrievalMetrics.retrieval_mode
+    }`,
+  );
+
+  if (retrievalMetrics.status === "computed") {
+    report.push(
+      `- Retrieval metrics@${retrievalMetrics.top_k}: hit rate ${retrievalMetrics.hit_rate_at_k}, average recall ${retrievalMetrics.average_recall_at_k}`,
+    );
+  } else {
+    report.push(`- Retrieval metrics: ${retrievalMetrics.reason}`);
+  }
+
+  report.push(`- Revised answers generated: ${revisedAnswers.length}`);
   report.push("");
 
   /*
@@ -124,6 +157,8 @@ async function main(): Promise<void> {
     const draft = draftByQueryId.get(retrieval.query_id);
     const review = reviewByQueryId.get(retrieval.query_id);
     const audit = auditByQueryId.get(retrieval.query_id);
+    const revisedAnswer = revisedAnswerByQueryId.get(retrieval.query_id);
+    const retrievalError = retrievalErrorByQueryId.get(retrieval.query_id);
 
     if (!draft || !review || !audit) {
       throw new Error(`Incomplete artifacts for query ${retrieval.query_id}`);
@@ -156,6 +191,23 @@ async function main(): Promise<void> {
     report.push("");
     report.push(`**Citation check:** ${audit.citation_check}`);
     report.push("");
+
+    if (revisedAnswer) {
+      report.push(`**Revised answer:** ${revisedAnswer.answer}`);
+      report.push("");
+      report.push(
+        `**Revised citations:** ${formatChunkIds(revisedAnswer.citations)}`,
+      );
+      report.push("");
+    }
+
+    if (retrievalError) {
+      report.push(`**Retrieval error analysis:** ${retrievalError.failure_type}`);
+      report.push("");
+      report.push(retrievalError.description);
+      report.push("");
+    }
+
     report.push(`**Final recommendation:** ${recommendation}`);
     report.push("");
   }
@@ -221,7 +273,25 @@ async function main(): Promise<void> {
   report.push("");
 
   /*
-   * 6. Recommendations
+   * 6. Retrieval Error Analysis
+   */
+  report.push("## Retrieval Error Analysis");
+  report.push("");
+
+  if (retrievalErrorAnalysis.length === 0) {
+    report.push("No retrieval error patterns required follow-up analysis.");
+  } else {
+    for (const entry of retrievalErrorAnalysis) {
+      report.push(
+        `- **${entry.query_id} — ${entry.failure_type}**: ${entry.description}`,
+      );
+    }
+  }
+
+  report.push("");
+
+  /*
+   * 7. Recommendations
    */
   report.push("## Recommended Improvements");
   report.push("");

@@ -1,5 +1,6 @@
 {
     "top_k": 3,
+    "retrieval_mode": "keyword",
     "answer_policy": "Answer only from the provided context. Clearly state when evidence is insufficient.",
     "allowed_labels": [
       "supported",
