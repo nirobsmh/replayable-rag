@@ -1,0 +1,24 @@
+[
+  {
+    "query_id": "q1",
+    "answer": "The retrieved context does not describe any features of InsightBoard. The available chunks only state that \"InsightBoard is a business\" and contain no information about features, so I cannot list its features from the provided context.",
+    "label": "unsupported",
+    "citations": [
+      "chunk_4bd3e144c20afe74",
+      "chunk_6e6428e7fc21e9af",
+      "chunk_bd68fd559fe1b481"
+    ],
+    "reasoning_summary": "All three retrieved chunks were reviewed; each only contains the fragment \"InsightBoard is a business\" and provides no details about features. Therefore the context lacks evidence to answer the question."
+  },
+  {
+    "query_id": "q2",
+    "answer": "Yes — the retrieved context mentions \"role-based access control,\" indicating the product supports role-based access.",
+    "label": "supported",
+    "citations": [
+      "chunk_136f470ab2fed43c",
+      "chunk_8e69f777585b633a",
+      "chunk_a90931ad404f5189"
+    ],
+    "reasoning_summary": "All three retrieved chunks include the phrase 'role-based access control,' which supports that the product offers role-based access."
+  }
+]

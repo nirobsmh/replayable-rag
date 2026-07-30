@@ -1,0 +1,16 @@
+{
+    "top_k": 3,
+    "answer_policy": "Answer only from the provided context. Clearly state when evidence is insufficient.",
+    "allowed_labels": [
+      "supported",
+      "partially_supported",
+      "unsupported"
+    ],
+    "citation_required": true,
+    "forbidden_behaviours": [
+      "Using facts not present in the context",
+      "Citing chunk IDs outside the final context",
+      "Presenting weak evidence as certain",
+      "Inventing product details"
+    ]
+  }

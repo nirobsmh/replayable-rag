@@ -1,0 +1,10 @@
+[
+    {
+      "query_id": "q1",
+      "question": "What features does InsightBoard provide?"
+    },
+    {
+      "query_id": "q2",
+      "question": "Does the product support role-based access?"
+    }
+  ]

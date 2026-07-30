@@ -1,0 +1,44 @@
+{
+  "name": "replayable-rag",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "chunk": "tsx scripts/chunk-documents.ts",
+    "index": "tsx scripts/build-index.ts",
+    "prepare:corpus": "npm run chunk && npm run index",
+    "retrieve": "tsx scripts/retrieve.ts",
+    "pipeline:retrieval": "npm run chunk && npm run retrieve",
+    "draft": "tsx scripts/generate-drafts.ts",
+    "pipeline:draft": "npm run chunk && npm run retrieve && npm run draft",
+    "review": "tsx scripts/review.ts",
+    "audit": "tsx scripts/audit-answers.ts",
+    "report": "tsx scripts/generate-report.ts",
+    "validate": "tsx scripts/validate.ts",
+    "pipeline": "npm run chunk && npm run retrieve && npm run draft && npm run review && npm run audit && npm run report && npm run validate"
+
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "minisearch": "^7.2.0",
+    "next": "16.2.12",
+    "openai": "^7.2.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.12",
+    "tsx": "^4.23.1",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  }
+}

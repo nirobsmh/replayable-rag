@@ -1,0 +1,50 @@
+[
+  {
+    "query_id": "q1",
+    "question": "What features does InsightBoard provide?",
+    "retrieved_chunks": [
+      {
+        "chunk_id": "chunk_4bd3e144c20afe74",
+        "document_name": "product_overview.txt",
+        "rank": 1,
+        "retrieval_score": 3.617977
+      },
+      {
+        "chunk_id": "chunk_6e6428e7fc21e9af",
+        "document_name": "product_overview.txt",
+        "rank": 2,
+        "retrieval_score": 3.617977
+      },
+      {
+        "chunk_id": "chunk_bd68fd559fe1b481",
+        "document_name": "product_overview.txt",
+        "rank": 3,
+        "retrieval_score": 3.617977
+      }
+    ]
+  },
+  {
+    "query_id": "q2",
+    "question": "Does the product support role-based access?",
+    "retrieved_chunks": [
+      {
+        "chunk_id": "chunk_136f470ab2fed43c",
+        "document_name": "product_overview.txt",
+        "rank": 1,
+        "retrieval_score": 22.5174
+      },
+      {
+        "chunk_id": "chunk_8e69f777585b633a",
+        "document_name": "product_overview.txt",
+        "rank": 2,
+        "retrieval_score": 21.755278
+      },
+      {
+        "chunk_id": "chunk_a90931ad404f5189",
+        "document_name": "product_overview.txt",
+        "rank": 3,
+        "retrieval_score": 21.755278
+      }
+    ]
+  }
+]

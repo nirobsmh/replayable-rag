@@ -1,0 +1,8 @@
+{
+  "engine": "minisearch",
+  "indexed_fields": [
+    "text"
+  ],
+  "chunk_count": 28,
+  "top_k": 3
+}
